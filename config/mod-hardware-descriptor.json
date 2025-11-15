@@ -1,0 +1,11 @@
+{
+    "name": "MOD Audio Generic PC",
+    "platform": "x86_64",
+    "audio_channels": 2,
+    "has_noisegate": true,
+    "has_tuner_input": true,
+    "has_midi_beat_clock_slave_port": true,
+    "has_midi_merger": true,
+    "has_midi_broadcaster": true,
+    "actuators": []
+}
