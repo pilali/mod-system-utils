@@ -1,0 +1,76 @@
+#!/bin/bash
+# Script de démarrage automatique de JACK avec détection d'interface audio
+# Pour MOD Audio sur Ubuntu 25.10
+
+# Forcer la locale anglaise pour les commandes système
+export LANG=C
+export LC_ALL=C
+
+# Fichier de configuration pour sauvegarder la dernière interface utilisée
+CONFIG_FILE="/var/modep/data/jack-device.conf"
+
+# Paramètres JACK par défaut
+SAMPLE_RATE=48000
+BUFFER_SIZE=256
+PERIODS=2
+PRIORITY=95
+
+# Fonction pour vérifier si une carte audio existe
+check_card_exists() {
+    local card=$1
+    aplay -l 2>/dev/null | grep -q "^card ${card}:"
+    return $?
+}
+
+# Fonction pour détecter l'interface audio à utiliser
+detect_audio_device() {
+    # Priorité 1 : Dernière interface utilisée (si elle existe encore)
+    if [ -f "$CONFIG_FILE" ]; then
+        LAST_DEVICE=$(cat "$CONFIG_FILE")
+        LAST_CARD=$(echo "$LAST_DEVICE" | sed 's/hw://')
+        if check_card_exists "$LAST_CARD"; then
+            echo "$LAST_DEVICE"
+            return 0
+        fi
+    fi
+
+    # Priorité 2 : Swissonic (hw:1) si connectée
+    if check_card_exists 1; then
+        echo "hw:1"
+        return 0
+    fi
+
+    # Priorité 3 : Carte son intégrée (hw:0)
+    if check_card_exists 0; then
+        echo "hw:0"
+        return 0
+    fi
+
+    # Aucune carte trouvée
+    echo "ERROR: No audio interface found" >&2
+    return 1
+}
+
+# Détecter l'interface audio
+DEVICE=$(detect_audio_device)
+if [ $? -ne 0 ]; then
+    echo "FATAL: Cannot find any audio interface" >&2
+    exit 1
+fi
+
+# Sauvegarder l'interface utilisée pour la prochaine fois
+mkdir -p "$(dirname "$CONFIG_FILE")"
+echo "$DEVICE" > "$CONFIG_FILE"
+
+# Afficher l'interface utilisée
+CARD_NUM=$(echo "$DEVICE" | sed 's/hw://')
+CARD_NAME=$(aplay -l 2>/dev/null | grep "^card ${CARD_NUM}:" | head -1 | sed 's/.*: //' | cut -d',' -f1)
+echo "Starting JACK with audio interface: $DEVICE ($CARD_NAME)"
+
+# Lancer JACK avec l'interface détectée
+exec /usr/bin/jackd -R -P${PRIORITY} \
+    -dalsa \
+    -d${DEVICE} \
+    -r${SAMPLE_RATE} \
+    -p${BUFFER_SIZE} \
+    -n${PERIODS}

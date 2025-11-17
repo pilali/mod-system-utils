@@ -1,0 +1,26 @@
+[Unit]
+Description=Browsepy File Manager for MOD-UI
+After=network.target
+Documentation=https://github.com/ergoithz/browsepy
+
+[Service]
+Type=simple
+User=pilal
+Group=pilal
+
+# Working directory
+WorkingDirectory=/var/modep/user-files
+
+# Browsepy command
+ExecStart=/usr/local/lib/mod-ui-venv/bin/browsepy --directory /var/modep/user-files --upload /var/modep/user-files 0.0.0.0 8081
+
+# Redémarrage automatique
+Restart=always
+RestartSec=3
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

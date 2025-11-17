@@ -1,6 +1,6 @@
 [Unit]
-Description=MOD-UI Web Interface
-After=mod-host.service
+Description=MOD-UI Web Interface (JACK2 Native)
+After=mod-host.service jackd.service
 Requires=mod-host.service
 Documentation=https://github.com/moddevices/mod-ui
 
@@ -8,12 +8,10 @@ Documentation=https://github.com/moddevices/mod-ui
 Type=simple
 User=pilal
 Group=pilal
+SupplementaryGroups=audio
 
 # Capability pour bind port 80 sans root
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-
-# Variables d'environnement PipeWire
-Environment="XDG_RUNTIME_DIR=/run/user/1000"
 
 # Variables d'environnement Python
 Environment="PYTHONPATH=/usr/local/lib/python3.10/site-packages"
@@ -22,7 +20,6 @@ Environment="PYTHONPATH=/usr/local/lib/python3.10/site-packages"
 Environment="MOD_DATA_DIR=/var/modep"
 Environment="MOD_HTML_DIR=/usr/local/share/mod/html"
 Environment="MOD_DEVICE_WEBSERVER_PORT=80"
-Environment="MOD_DEV_HOST=1"
 Environment="LV2_PATH=/var/modep/lv2:/usr/local/lib/lv2:/usr/lib/lv2"
 Environment="MOD_LOG=1"
 Environment="MOD_USER_FILES_DIR=/var/modep/user-files"
@@ -34,8 +31,8 @@ Environment="MOD_DEFAULT_PEDALBOARD=/usr/local/share/mod/default.pedalboard"
 # Attente que mod-host soit prêt
 ExecStartPre=/bin/sleep 5
 
-# Démarrage mod-ui (avec pw-jack pour accéder à JACK)
-ExecStart=/usr/bin/pw-jack /usr/local/bin/mod-ui
+# Démarrage mod-ui (JACK natif, sans pw-jack)
+ExecStart=/usr/local/bin/mod-ui
 
 # Redémarrage automatique
 Restart=always

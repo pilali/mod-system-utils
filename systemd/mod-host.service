@@ -1,6 +1,7 @@
 [Unit]
-Description=MOD-Host LV2 Plugin Host (via PipeWire-JACK)
-After=sound.target
+Description=MOD-Host LV2 Plugin Host (JACK2 Native)
+After=jackd.service
+Requires=jackd.service
 Documentation=man:mod-host(1)
 
 [Service]
@@ -9,13 +10,12 @@ User=pilal
 Group=pilal
 SupplementaryGroups=audio
 
-# Variables d'environnement pour PipeWire
-Environment="XDG_RUNTIME_DIR=/run/user/1000"
+# Variables d'environnement
 Environment="LV2_PATH=/var/modep/lv2:/usr/local/lib/lv2:/usr/lib/lv2"
 Environment="MOD_LOG=1"
 
-# Démarrage mod-host via pw-jack (PipeWire JACK wrapper)
-ExecStart=/usr/bin/pw-jack /usr/local/bin/mod-host -v -n -p 5555 -f 5556
+# Démarrage mod-host (JACK natif, sans pw-jack)
+ExecStart=/usr/local/bin/mod-host -v -n -p 5555 -f 5556
 
 # Redémarrage automatique
 Restart=always

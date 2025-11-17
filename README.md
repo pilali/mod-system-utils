@@ -1,326 +1,206 @@
-# mod-system-utils
+# MOD System Utils
 
-System configuration utilities for running mod-host and mod-ui on Ubuntu 25.10 with PipeWire.
+Configuration système et scripts pour MOD Audio sur Ubuntu 25.10 avec JACK2.
 
-This repository contains systemd service files, configuration files, and installation scripts for setting up a complete MOD Audio system on Ubuntu with PipeWire audio.
+## Description
 
-## Overview
+Ce dépôt contient tous les fichiers de configuration nécessaires pour installer et exécuter MOD Audio (mod-host + mod-ui) sur Ubuntu 25.10 avec JACK2 natif (sans PipeWire bridge).
 
-This repository provides the "glue" that makes mod-host and mod-ui work together as a complete audio processing system on modern Ubuntu with PipeWire:
+## Contenu
 
-- **Systemd services**: Automatic startup and management of mod-host and mod-ui
-- **PipeWire-JACK configuration**: Proper integration with PipeWire audio system
-- **Hardware descriptor**: Configuration for audio I/O and device capabilities
-- **Web interface**: JACK configuration through mod-ui settings page
+### `/systemd/`
 
-## Prerequisites
+Services systemd pour gérer les composants MOD Audio :
+- **jackd.service** : Service JACK2 Audio avec détection automatique d'interface
+- **mod-host.service** : Service LV2 plugin host
+- **mod-ui.service** : Service interface web MOD
+- **browsepy.service** : Service gestionnaire de fichiers
 
-Before using this repository, you must install:
+### `/scripts/`
 
-1. **mod-host**: [Installation guide](https://github.com/pilali/mod-host/blob/ubuntu-pipewire-build/INSTALL-UBUNTU-PIPEWIRE.md)
-2. **mod-ui**: [Installation guide](https://github.com/pilali/mod-ui/blob/ubuntu-pipewire-install/INSTALL-UBUNTU-PIPEWIRE.md)
+Scripts utilitaires :
+- **start-jack-auto** : Script de détection et démarrage automatique de JACK avec bascule d'interface audio
 
-## Quick Start
+### `/docs/`
+
+Documentation complète :
+- **INSTALL-UBUNTU-25.10.md** : Guide d'installation complet pas à pas
+
+## Installation rapide
 
 ```bash
-# Clone this repository
+# Cloner ce dépôt
 git clone https://github.com/pilali/mod-system-utils.git
 cd mod-system-utils
 
-# Run installation script
-sudo ./install.sh
+# Copier les services systemd
+sudo cp systemd/*.service /etc/systemd/system/
 
-# Enable and start services
+# Installer le script JACK
+sudo install -m 755 scripts/start-jack-auto /usr/local/bin/
+
+# Adapter les noms d'utilisateur
+sudo sed -i "s/User=pilal/User=$USER/g" /etc/systemd/system/*.service
+
+# Recharger et activer les services
 sudo systemctl daemon-reload
-sudo systemctl enable mod-host.service mod-ui.service
-sudo systemctl start mod-host.service mod-ui.service
-
-# Check status
-sudo systemctl status mod-host.service
-sudo systemctl status mod-ui.service
+sudo systemctl enable jackd.service mod-host.service mod-ui.service browsepy.service
 ```
 
-## Repository Structure
+Pour une installation complète depuis zéro, consultez [docs/INSTALL-UBUNTU-25.10.md](docs/INSTALL-UBUNTU-25.10.md).
+
+## Architecture
 
 ```
-mod-system-utils/
-├── systemd/
-│   ├── mod-host.service    # Systemd service for mod-host
-│   └── mod-ui.service      # Systemd service for mod-ui
-├── config/
-│   └── mod-hardware-descriptor.json  # Hardware configuration
-├── html/
-│   └── settings.html       # Modified settings page with JACK config
-├── scripts/
-│   └── (future scripts)
-├── install.sh              # Installation script
-└── README.md
+Interface Audio (ALSA)
+    ↓
+JACK2 (détection auto hw:0/hw:1)
+    ↓
+mod-host (LV2 plugin host)
+    ↓
+mod-ui (Web interface :80)
 ```
 
-## What's Inside
+**⚠️ CHANGEMENT MAJEUR :** Cette version utilise **JACK2 natif** au lieu du bridge PipeWire-JACK pour obtenir une latence minimale (~10-12ms round-trip).
 
-### Systemd Services
+## Caractéristiques
 
-#### mod-host.service
+- ✅ Latence audio ~10-12ms round-trip (256 samples @ 48kHz)
+- ✅ Détection automatique d'interface audio (USB/intégrée)
+- ✅ JACK2 natif (pas de PipeWire bridge)
+- ✅ Services systemd avec auto-restart
+- ✅ Support complet LV2 plugins
+- ✅ Interface web sur port 80
+- ✅ Browsepy pour gestion de fichiers
 
-Runs mod-host with PipeWire-JACK support:
-- Uses `pw-jack` wrapper for JACK connectivity
-- Listens on ports 5555 (commands) and 5556 (feedback)
-- Runs as your user account
-- Automatically restarts on failure
+## Configuration requise
 
-#### mod-ui.service
+- Ubuntu 25.10 (Oracular Oriole)
+- Kernel 6.17+
+- Python 3.10
+- JACK2
+- Interface audio ALSA compatible
 
-Runs mod-ui web interface with JACK support:
-- Uses `pw-jack` wrapper (essential for port management)
-- Binds to port 80 (requires CAP_NET_BIND_SERVICE capability)
-- Depends on mod-host.service
-- Provides web UI at http://localhost/
+## Dépendances
 
-### Configuration Files
+Voir [docs/INSTALL-UBUNTU-25.10.md](docs/INSTALL-UBUNTU-25.10.md) pour la liste complète des dépendances et instructions d'installation.
 
-#### mod-hardware-descriptor.json
+## Utilisation
 
-Defines the audio hardware capabilities:
-```json
-{
-    "name": "MOD Audio Generic PC",
-    "platform": "x86_64",
-    "audio_channels": 2,
-    "has_noisegate": true,
-    "has_tuner_input": true,
-    ...
-}
-```
-
-This file tells mod-ui:
-- How many audio channels are available
-- What features to enable (tuner, noisegate, etc.)
-- Which JACK ports to look for
-
-### Web Interface
-
-#### settings.html
-
-Modified version of mod-ui's settings page that includes:
-- JACK/PipeWire configuration interface
-- Audio interface selection
-- Sample rate and buffer size configuration
-- Integration with `/jack/interfaces`, `/jack/config`, and `/jack/restart` endpoints
-
-## Installation Details
-
-The `install.sh` script performs the following:
-
-1. Copies systemd service files to `/etc/systemd/system/`
-2. Copies hardware descriptor to `/etc/mod-hardware-descriptor.json`
-3. Copies modified settings.html to `/usr/local/share/mod/html/`
-4. Sets appropriate permissions
-5. Creates `/var/modep` data directory if needed
-
-## Key Configuration Points
-
-### Why pw-jack is Required
-
-Both services use the `pw-jack` wrapper:
-
-```ini
-ExecStart=/usr/bin/pw-jack /usr/local/bin/mod-host -v -n -p 5555 -f 5556
-```
-
-This is **essential** because:
-- PipeWire provides JACK compatibility through a wrapper
-- Without `pw-jack`, applications cannot connect to JACK ports
-- mod-ui needs JACK to manage audio connections and display ports
-
-### Port 80 Access
-
-mod-ui binds to port 80 without running as root using:
-
-```ini
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-```
-
-This gives the process permission to bind privileged ports while running as your user.
-
-### Environment Variables
-
-Important variables set in the service files:
-
-| Variable | Purpose |
-|----------|---------|
-| `XDG_RUNTIME_DIR` | PipeWire runtime directory |
-| `MOD_DATA_DIR` | mod-ui data storage |
-| `MOD_HTML_DIR` | Web interface files |
-| `MOD_DEV_HOST` | Enable development features |
-| `LV2_PATH` | LV2 plugin search paths |
-| `PYTHONPATH` | Python module search path |
-
-## Usage
-
-### Starting the System
+### Démarrer les services
 
 ```bash
-# Start both services
-sudo systemctl start mod-host.service mod-ui.service
-
-# Check they're running
-sudo systemctl status mod-host
-sudo systemctl status mod-ui
+sudo systemctl start jackd.service
+sudo systemctl start mod-host.service
+sudo systemctl start mod-ui.service
+sudo systemctl start browsepy.service
 ```
 
-### Accessing the Web Interface
+### Accéder à l'interface
 
-1. Open browser to `http://localhost/`
-2. You should see the mod-ui pedalboard interface
-3. Audio inputs and outputs should be visible
-4. CPU activity should show percentage (not 0%)
+- **MOD UI** : http://localhost
+- **Browsepy** : http://localhost:8081
 
-### Configuring JACK/PipeWire
-
-1. Go to `http://localhost/settings.html`
-2. Select your audio interface from the dropdown
-3. Configure sample rate and buffer size
-4. Click "Restart JACK" to apply changes
-
-### Viewing Logs
+### Voir les logs
 
 ```bash
-# mod-host logs
+# Logs JACK
+sudo journalctl -u jackd.service -f
+
+# Logs mod-host
 sudo journalctl -u mod-host.service -f
 
-# mod-ui logs
+# Logs mod-ui
 sudo journalctl -u mod-ui.service -f
-
-# Both together
-sudo journalctl -u mod-host.service -u mod-ui.service -f
 ```
 
-## Troubleshooting
+### Changer d'interface audio
 
-### Services won't start
+Le script `start-jack-auto` détecte automatiquement l'interface audio prioritaire :
+1. Dernière interface utilisée (si disponible)
+2. Interface externe USB (hw:1)
+3. Carte son intégrée (hw:0)
 
-Check the logs:
+Pour forcer une interface :
 ```bash
-sudo journalctl -u mod-host.service -n 50
-sudo journalctl -u mod-ui.service -n 50
+echo "hw:1" | sudo tee /var/modep/data/jack-device.conf
+sudo systemctl restart jackd.service
 ```
 
-Common issues:
-- mod-host or mod-ui not installed
-- PipeWire not running
-- Port 5555 or 80 already in use
+## Dépannage
 
-### No audio ports visible in web UI
+Consultez la section [Dépannage](docs/INSTALL-UBUNTU-25.10.md#dépannage) de la documentation complète.
 
-This usually means mod-ui is not connected to JACK:
+### Problèmes courants
 
-1. Check mod-ui is using pw-jack:
+**mod-ui ne communique pas avec mod-host :**
 ```bash
-ps aux | grep mod-ui
-# Should show: /usr/bin/pw-jack /usr/local/bin/mod-ui
-```
+# Vérifier que MOD_DEV_HOST n'est PAS défini
+sudo grep MOD_DEV_HOST /etc/systemd/system/mod-ui.service
 
-2. Restart mod-ui service:
-```bash
+# Si présent, le supprimer
+sudo sed -i '/MOD_DEV_HOST=1/d' /etc/systemd/system/mod-ui.service
+sudo systemctl daemon-reload
 sudo systemctl restart mod-ui.service
 ```
 
-### CPU shows 0%
-
-This means mod-ui cannot communicate with mod-host:
-
-1. Check mod-host is running:
+**JACK ne démarre pas :**
 ```bash
-sudo systemctl status mod-host
+# Vérifier les interfaces disponibles
+aplay -l
+
+# Voir les logs
+sudo journalctl -u jackd.service -n 50
 ```
 
-2. Check ports are listening:
+**Bascule automatique d'interface :**
+Le script `start-jack-auto` bascule automatiquement entre les interfaces. Après branchement/débranchement d'une interface USB, redémarrez simplement :
 ```bash
-ss -tlnp | grep -E "5555|5556"
+sudo systemctl restart jackd.service
 ```
 
-3. Check mod-ui can connect to JACK:
+## Différences avec PipeWire
+
+Cette configuration utilise **JACK2 natif** au lieu de PipeWire avec bridge JACK :
+
+| Aspect | PipeWire-JACK Bridge | JACK2 Natif |
+|--------|---------------------|-------------|
+| Latence | ~42-64ms (1024 samples) | ~10-12ms (256 samples) |
+| Commande | `pw-jack mod-host` | `mod-host` directement |
+| Variable ENV | `XDG_RUNTIME_DIR=/run/user/1000` | `JACK_NO_AUDIO_RESERVATION=1` |
+| Stabilité | Bon | Excellent |
+| Intégration | Partage avec PipeWire | JACK exclusif |
+
+## Compilation de mod-host
+
+Si vous recompilez mod-host, utilisez ces flags :
+
 ```bash
-pw-jack jack_lsp
-# Should show mod-host:in1, mod-host:in2, mod-host:out1, mod-host:out2
+CFLAGS="-DMOD_IO_PROCESSING_ENABLED -D__MOD_DEVICES__" make -j$(nproc)
+sudo make install
 ```
 
-## Architecture Notes
+Ces flags activent :
+- `-DMOD_IO_PROCESSING_ENABLED` : Ports audio I/O (in1, in2, out1, out2)
+- `-D__MOD_DEVICES__` : Support matériel MOD Devices
 
-### Audio Flow
+## Licence
 
-```
-Hardware Audio Interface
-        ↕ (ALSA)
-    PipeWire
-        ↕ (JACK bridge via pw-jack)
-    mod-host (LV2 plugin host)
-        ↕ (TCP socket 5555/5556)
-    mod-ui (Web interface)
-        ↕ (HTTP)
-    Web Browser
-```
+Configuration système pour MOD Audio, distribué sous les mêmes termes que les projets upstream.
 
-### Why This Setup Works
+## Références
 
-1. **PipeWire** provides modern audio routing with JACK compatibility
-2. **pw-jack** wrapper allows JACK applications to work with PipeWire
-3. **mod-host** processes audio through LV2 plugins
-4. **mod-ui** provides web-based control and visualization
-5. **Systemd** manages services and dependencies automatically
+- [MOD Audio](https://github.com/moddevices)
+- [mod-host](https://github.com/moddevices/mod-host)
+- [mod-ui](https://github.com/moddevices/mod-ui)
+- [JACK Audio](https://jackaudio.org/)
 
-## Customization
+## Auteur
 
-### Changing the Web Port
+Configuration et documentation par pilali avec l'assistance de Claude Code.
 
-Edit `systemd/mod-ui.service`:
+---
 
-```ini
-Environment="MOD_DEVICE_WEBSERVER_PORT=8080"
-```
-
-Then reinstall and restart:
-```bash
-sudo ./install.sh
-sudo systemctl daemon-reload
-sudo systemctl restart mod-ui
-```
-
-### Using a Different Audio Interface
-
-1. Go to http://localhost/settings.html
-2. Select your interface from the dropdown
-3. Click "Restart JACK"
-
-Or edit PipeWire configuration directly (advanced).
-
-### Adding More LV2 Plugins
-
-Add plugin directories to the `LV2_PATH` in both service files:
-
-```ini
-Environment="LV2_PATH=/var/modep/lv2:/usr/local/lib/lv2:/usr/lib/lv2:/your/custom/path"
-```
-
-## Contributing
-
-Contributions welcome! This repository is specifically for Ubuntu 25.10 + PipeWire setup, but could be adapted for other distributions.
-
-## Related Projects
-
-- [mod-host](https://github.com/pilali/mod-host) - LV2 plugin host
-- [mod-ui](https://github.com/pilali/mod-ui) - Web interface for mod-host
-- [MOD Audio](https://mod.audio/) - Original MOD Audio project
-
-## License
-
-These configuration files and scripts are provided under GPL-3.0 license to match mod-host and mod-ui licensing.
-
-## Credits
-
-Based on the excellent work by:
-- [MOD Audio team](https://github.com/moddevices)
-- [sejerpz](https://github.com/sejerpz) for Python 3.x compatibility work on mod-ui
-
-System integration by pilali with assistance from Claude Code.
+**Version** : 2.0 (JACK2 Native)
+**Date** : 2025-11-17
+**Testé sur** : Ubuntu 25.10

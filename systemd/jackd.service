@@ -1,0 +1,26 @@
+[Unit]
+Description=JACK Audio Connection Kit (for MOD Audio)
+After=sound.target
+Documentation=https://jackaudio.org/
+
+[Service]
+Type=simple
+User=pilal
+Group=audio
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+
+# JACK auto-detection script
+Environment="JACK_NO_AUDIO_RESERVATION=1"
+ExecStart=/usr/local/bin/start-jack-auto
+
+# Restart on failure
+Restart=on-failure
+RestartSec=3
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
